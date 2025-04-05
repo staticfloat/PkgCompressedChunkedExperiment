@@ -7,6 +7,7 @@ This repository's purpose is to prove out a possible forward path on improving r
 To run the experiment locally, first run:
 
 ```
+julia --project -e 'import Pkg; Pkg.instantiate()'
 julia --project PopulatePkgServerChunkStore.jl
 julia --project ServeChunkStore.jl
 ```
