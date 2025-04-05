@@ -47,7 +47,7 @@ It compares the current methodology (transferring a gzipped tarball every time) 
 A partial view of the results can be seen in this image:
 ![](./CompressionStats.png)
 
-As can be seen, while a simple `zstd`-compressed tarball can achieve the best on-disk compression ratio, the chunked forms achieve a much lower amount of data transferred for the update process.
+While a simple `zstd`-compressed tarball can achieve the best on-disk compression ratio, the chunked forms achieve a much lower amount of data transferred for the update process.
 This graph is showing results for only a single registry update (simulating a time delta of ~10 days), although the relative ordering of solutions remains constant over a variety of choices.
 
 ## Future Work: Seekable Zstd Streams
