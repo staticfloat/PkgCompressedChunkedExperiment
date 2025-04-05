@@ -50,6 +50,8 @@ A partial view of the results can be seen in this image:
 While a simple `zstd`-compressed tarball can achieve the best on-disk compression ratio, the chunked forms achieve a much lower amount of data transferred for the update process.
 This graph is showing results for only a single registry update (simulating a time delta of ~10 days), although the relative ordering of solutions remains constant over a variety of choices.
 
+My current thinking is that we can probably go with the medium chunksize to reduce the number of chunks needed to be handled, as well as slightly improving the on-disk footprint.
+
 ## Future Work: Seekable Zstd Streams
 
 A natural extension of this is to embed a [seek table](https://github.com/facebook/zstd/blob/v1.5.7/contrib/seekable_format/zstd_seekable_compression_format.md#seek-table-format) at the end of our compressed-chunk tarball, which would make it compatible with the [Zstd seekable format](https://github.com/facebook/zstd/tree/c5926fbab893423ec43439a82fbddcc1b40dfe1a/contrib/seekable_format).
