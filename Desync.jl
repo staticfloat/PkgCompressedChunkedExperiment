@@ -161,11 +161,13 @@ end
 
 using Zstd_jll
 """
-    recompress_indices()
+    recompress_chunks()
 
-This 
+This function recompresses all chunks within the given chunk store.
+It also trains a zstd dictionary on the uncompressed chunks so that
+the recompression is maximally effective.
 """
-function recompress_indices(;dopts::DesyncOptions = DesyncOptions(), train_dict::Bool = false, nworkers=Sys.CPU_THREADS, verbose::Bool = false)
+function recompress_chunks(;dopts::DesyncOptions = DesyncOptions(), train_dict::Bool = false, nworkers=Sys.CPU_THREADS, verbose::Bool = false)
     if dopts.chunk_store === nothing
         return
     end
@@ -287,21 +289,6 @@ function recompress_indices(;dopts::DesyncOptions = DesyncOptions(), train_dict:
                 improvement_ratio=recompressed_size*1.0/original_size,
             )
         end
-    end
-end
-
-
-function reconstitute_tarball(tarball_path::String; dopts::DesyncOptions = DesyncOptions())
-    mktempdir() do dir
-        # First, index the tarball to store the chunks and get them as a list
-        index_path = joinpath(dir, "tarball.caibx")
-        chunks = index(index_path, tarball_path; dopts)
-
-        # Recompress those new chunks
-        recompress_indices(;dopts, train_dict=false)
-
-        # Build a new tarball by copying in the chunks from the index
-        synthesize(tarball_path, chunks; dopts)
     end
 end
 

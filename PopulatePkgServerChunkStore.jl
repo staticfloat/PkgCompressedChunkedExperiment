@@ -38,7 +38,7 @@ symlink(string(registry_hashes[end], ".caibx"), joinpath(indexes_dir, "latest"))
 symlink(registry_hashes[end], joinpath(registries_dir, "latest"))
 
 # Next, compress the chunk store
-Desync.recompress_indices(;dopts, verbose=true)
+Desync.recompress_chunks(;dopts, verbose=true)
 
 # Finally, reconstruct our registries via `synthesize()` so that our
 # registry tarballs are in compressed-chunk format.

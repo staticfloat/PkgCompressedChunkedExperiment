@@ -25,6 +25,8 @@ struct ZstdFrame <: AbstractZstdHeader
 
     # Size of the frame (header + payload)
     compressed_len::UInt64
+
+    # Size of the payload when it is uncompressed
     uncompressed_len::UInt64
 
     # Dictionary used to compress this frame (zero means no dictionary)

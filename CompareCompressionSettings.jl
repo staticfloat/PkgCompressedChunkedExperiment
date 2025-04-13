@@ -91,7 +91,7 @@ for (idx, (chunk_size_name, chunk_size)) in enumerate(chunk_sizes)
         index_file = joinpath(indexes_dir, "$(name)-$(chunk_size_name).caibx")
         Desync.index(index_file, reg_file; dopts)
     end
-    Desync.recompress_indices(; dopts)
+    Desync.recompress_chunks(; dopts)
 
     # Reconstruct tarballs using these recompressed indices
     for name in ("old", "new")
