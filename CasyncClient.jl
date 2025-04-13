@@ -10,7 +10,8 @@ include("LibZstd.jl")
 using .LibZstd
 
 # We store chunk IDs in skippable frames, identified by this value:
-const chunk_id_skippable_frame_magic = UInt32(0x184D2A5E)
+const chunk_id_skippable_frame_magic = UInt32(0x184D2A5D)
+const zstd_seekable_skippable_frame_magic = UInt32(0x184D2A5E)
 const chunk_id_hash_len = 32
 
 """
@@ -142,16 +143,40 @@ function synthesize(output_path::String, chunks::Vector{ChunkId}, chunk_store_pa
     # Start to assemble our output file
     rm(output_path; force=true)
     open(output_path; write=true) do io
+        # Store information for each chunk; we want to know (compressed_len, uncompressed_len) for each.
+        seekable_table = Tuple{UInt32,UInt32}[]
+
+        function peek_zstd_frame(io::IO)
+            mark(io)
+            frames = list_frames(io)
+            if isempty(frames)
+                error("Cannot find zstd frame header in $(io) $(position(io))")
+            end
+            frame = first(frames)
+            reset(io)
+            return frame
+        end
+
+        function store_seekable_table(io::IO)
+            frame = peek_zstd_frame(io)
+            push!(seekable_table, (frame.compressed_len, frame.uncompressed_len))
+        end
+
         for chunk in chunks
             # Do we have this chunk available in a chunk store?
             local_path = chunk_path(chunk, chunk_store_path)
             if isfile(local_path)
                 open(local_path; read=true) do local_io
+                    store_seekable_table(local_io)
                     write(io, local_io)
                 end
             elseif haskey(seed_map, chunk)
                 seed_chunk, seed_chunk_io = seed_map[chunk]
                 seek(seed_chunk_io, seed_chunk.offset)
+
+                # Store compressed_len/uncompressed_len for the seekable table
+                store_seekable_table(seed_chunk_io)
+
                 left_to_write = seed_chunk.len
                 while left_to_write > 0
                     data = read(seed_chunk_io, left_to_write)
@@ -174,6 +199,23 @@ function synthesize(output_path::String, chunks::Vector{ChunkId}, chunk_store_pa
             write(io, UInt32(chunk_id_hash_len))
             write(io, chunk.hash)
         end
+
+        # Write out the seekable table format
+        seekable_frame_len = length(seekable_table) * 2 * 2 * sizeof(UInt32) + 2*sizeof(UInt32) + sizeof(UInt8)
+        write(io, UInt32(zstd_seekable_skippable_frame_magic))
+        write(io, UInt32(seekable_frame_len))
+        for (compressed_len, uncompressed_len) in seekable_table
+            # Write out data for the ZstdFrame
+            write(io, UInt32(compressed_len))
+            write(io, UInt32(uncompressed_len))
+
+            # Write out data for the ZstdSkippableFrame
+            write(io, UInt32(4 + 4 + chunk_id_hash_len))
+            write(io, UInt32(0))
+        end
+        write(io, UInt32(length(seekable_table)*2))
+        write(io, UInt8(0x00))
+        write(io, UInt32(0x8F92EAB1))
     end
 
     # Close all our seed file handles
