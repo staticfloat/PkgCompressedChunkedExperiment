@@ -2,7 +2,7 @@
 
 julia_version = "1.11.4"
 manifest_format = "2.0"
-project_hash = "7abbe6ef2c12b30a315f4c0eef807c587bca754a"
+project_hash = "75502fb510fbb68867bf5cf23f5607589dd78668"
 
 [[deps.ArgTools]]
 uuid = "0dad84c5-d112-42e6-8d28-ef12dabb789f"
@@ -230,6 +230,12 @@ deps = ["Libdl"]
 uuid = "83775a58-1f1d-513f-b197-d71354ab007a"
 version = "1.2.13+1"
 
+[[deps.ZstdSeekable_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Zstd_jll", "xxHash_jll"]
+git-tree-sha1 = "42757917520fbd542126b93f4f1d84625e250bdf"
+uuid = "86ac9985-db92-5090-8b9c-ec8f613186b3"
+version = "1.5.7+0"
+
 [[deps.Zstd_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
 git-tree-sha1 = "446b23e73536f84e8037f5dce465e92275f6a308"
@@ -251,3 +257,9 @@ version = "1.59.0+0"
 deps = ["Artifacts", "Libdl"]
 uuid = "3f19e933-33d8-53b3-aaab-bd5110c3b7a0"
 version = "17.4.0+2"
+
+[[deps.xxHash_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "7ccccb58a635a8dc2a504ad0e983235a88601133"
+uuid = "5fdcd639-92d1-5a06-bf6b-28f2061df1a9"
+version = "0.8.3+0"
