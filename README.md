@@ -53,8 +53,8 @@ This graph is showing results for only a single registry update (simulating a ti
 
 My current thinking is that we can probably go with the medium chunksize to reduce the number of chunks needed to be handled, as well as slightly improving the on-disk footprint.
 
-## Future Work: Seekable Zstd Streams
+## Seekable archives
 
-A natural extension of this is to embed a [seek table](https://github.com/facebook/zstd/blob/v1.5.7/contrib/seekable_format/zstd_seekable_compression_format.md#seek-table-format) at the end of our compressed-chunk tarball, which would make it compatible with the [Zstd seekable format](https://github.com/facebook/zstd/tree/c5926fbab893423ec43439a82fbddcc1b40dfe1a/contrib/seekable_format).
-This, combined with a random-access `Tar.jl` adapter, would provide the foundation for registries and packages that don't need to be unpacked from their archives, nor loaded entirely into memory.
+A natural extension of this is to embed a [seek table](https://github.com/facebook/zstd/blob/v1.5.7/contrib/seekable_format/zstd_seekable_compression_format.md#seek-table-format) at the end of our compressed-chunk tarball, which makes it compatible with the [Zstd seekable format](https://github.com/facebook/zstd/tree/c5926fbab893423ec43439a82fbddcc1b40dfe1a/contrib/seekable_format).
+We do this to support a future random-access `Tar.jl` adapter, which would provide the foundation for registries and packages that don't need to be unpacked from their archives, nor loaded entirely into memory.
 
