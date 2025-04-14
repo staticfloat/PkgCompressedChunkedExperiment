@@ -10,8 +10,10 @@ include("LibZstd.jl")
 using .LibZstd
 
 # We store chunk IDs in skippable frames, identified by this value:
-const chunk_id_skippable_frame_magic = UInt32(0x184D2A5D)
+const chunk_id_table_skippable_frame_magic = UInt32(0x184D2A5D)
+const chunk_id_table_skippable_frame_cookie = UInt32(0xD12FA2A3)
 const zstd_seekable_skippable_frame_magic = UInt32(0x184D2A5E)
+const zstd_seekable_skippable_frame_cookie = UInt32(0x8F92EAB1)
 const chunk_id_hash_len = 32
 
 """
@@ -101,32 +103,61 @@ struct CompressedChunk
     len::UInt32
 end
 
-function load_seed_chunks(seed_file::String)
-    compressed_chunks = CompressedChunk[]
+"""
+    load_seed_chunks(io::IO)
 
-    frames = LibZstd.list_frames(seed_file)
+Scan a compressed archive for content-defined chunks embedded within it, which
+we refer to as "seed" chunks, which will be used to synthesize a new compressed
+archive with.
 
-    # Look for skippable frames that immediately follow normal
-    # zstd frames; these are the ones that contain chunk IDs
-    for idx in 2:length(frames)
-        function is_chunk_id_frame(idx)
-            return isa(frames[idx], LibZstd.ZstdSkippableFrame) &&
-                    isa(frames[idx-1], LibZstd.ZstdFrame) &&
-                    frames[idx].magic == chunk_id_skippable_frame_magic &&
-                    length(frames[idx].data) == chunk_id_hash_len
+The seed chunks are identified by their content hash, however to avoid needing
+to decompress and hash each chunk, we store a skippable metadata frame at the
+end of our compressed archives, identifying the content hash of each chunk.
+This method extracts that metadata.
+"""
+function load_seed_chunks(io::IO)
+    # Get the list of frames from the archive, and remove all the skippable ones
+    # to get the chunks of actual content, which we will then pair up with their
+    # chunk IDs from a skippable frame:
+    frames = LibZstd.list_frames(io)
+    zstd_frames = filter(frame -> isa(frame, LibZstd.ZstdFrame), frames)
+
+    function get_chunk_ids(frames, num_chunks)
+        # The chunk ID table is usually stored at the end of the list of frames:
+        for idx in length(frames):-1:1
+            if !isa(frames[idx], LibZstd.ZstdSkippableFrame)
+                continue
+            end
+            if frames[idx].magic != chunk_id_table_skippable_frame_magic
+                continue
+            end
+            if length(frames[idx].data) != num_chunks*chunk_id_hash_len + sizeof(UInt32)
+                continue
+            end
+            if reinterpret(frames[idx].data[end-4:end], UInt32) != chunk_id_table_skippable_frame_cookie
+                continue
+            end
+
+            # If we've made it through the gauntlet, then `frames[idx].data` contains our Chunk ID table
+            return reshape(frames[idx].data[1:end-4], (chunk_id_hash_len, num_chunks))
         end
-        if is_chunk_id_frame(idx)
-            push!(compressed_chunks, CompressedChunk(
-                ChunkId(frames[idx].data),
-                frames[idx-1].dictionary_id,
-                frames[idx-1].offset,
-                frames[idx-1].compressed_len,
-            ))
-        end
+        return nothing
     end
-    return compressed_chunks
-end
 
+    # List of chunk IDs
+    chunk_id_matrix = get_chunk_ids(frames, length(zstd_frames))
+
+    # Construct a `CompressedChunk` for each zstd frame.
+    return CompressedChunk[
+        CompressedChunk(
+            ChunkId(chunk_id_matrix[:, idx]),
+            zstd_frames[idx].dictionary_id,
+            zstd_frames[idx].offset,
+            zstd_frames[idx].compressed_len,
+        ) for idx in 1:length(zstd_frames)
+    ]
+end
+load_seed_chunks(file::String) = open(load_seed_chunks, file; read=true)
 
 function synthesize(output_path::String, chunks::Vector{ChunkId}, chunk_store_path::String, seed_files::Vector{String} = String[])
     # For each seed file, see if there's a compressed chunk index alongside it
@@ -192,30 +223,31 @@ function synthesize(output_path::String, chunks::Vector{ChunkId}, chunk_store_pa
                 @error("Missing chunk", chunk)
                 error()
             end
-
-            # After writing that zstd frame, write a skippable frame that identifies its hash
-            # [skippable magic], [data length], [hash data]
-            write(io, UInt32(chunk_id_skippable_frame_magic))
-            write(io, UInt32(chunk_id_hash_len))
-            write(io, chunk.hash)
         end
 
-        # Write out the seekable table format
-        seekable_frame_len = length(seekable_table) * 2 * 2 * sizeof(UInt32) + 2*sizeof(UInt32) + sizeof(UInt8)
+        # Write out our Chunk ID table
+        # [magic], [payload length], [hash, ...], [cookie]
+        write(io, UInt32(chunk_id_table_skippable_frame_magic))
+        chunk_id_table_frame_len = length(chunks) * chunk_id_hash_len + sizeof(UInt32)
+        write(io, UInt32(chunk_id_table_frame_len))
+        for chunk in chunks
+            write(io, chunk.hash)
+        end
+        write(io, chunk_id_table_skippable_frame_cookie)
+
+        # Write out the seekable table format:
+        # [magic], [payload length], [(compressed_len, uncompressed_len), ...], [num_frames], [0x00], [cookie]
+        seekable_frame_len = length(seekable_table) * 2*sizeof(UInt32) + 2*sizeof(UInt32) + sizeof(UInt8)
         write(io, UInt32(zstd_seekable_skippable_frame_magic))
         write(io, UInt32(seekable_frame_len))
         for (compressed_len, uncompressed_len) in seekable_table
             # Write out data for the ZstdFrame
             write(io, UInt32(compressed_len))
             write(io, UInt32(uncompressed_len))
-
-            # Write out data for the ZstdSkippableFrame
-            write(io, UInt32(4 + 4 + chunk_id_hash_len))
-            write(io, UInt32(0))
         end
-        write(io, UInt32(length(seekable_table)*2))
+        write(io, UInt32(length(seekable_table)))
         write(io, UInt8(0x00))
-        write(io, UInt32(0x8F92EAB1))
+        write(io, UInt32(zstd_seekable_skippable_frame_cookie))
     end
 
     # Close all our seed file handles
