@@ -134,7 +134,7 @@ function load_seed_chunks(io::IO)
             if length(frames[idx].data) != num_chunks*chunk_id_hash_len + sizeof(UInt32)
                 continue
             end
-            if reinterpret(frames[idx].data[end-4:end], UInt32) != chunk_id_table_skippable_frame_cookie
+            if reinterpret(UInt32, frames[idx].data[end-3:end])[1] != chunk_id_table_skippable_frame_cookie
                 continue
             end
 
