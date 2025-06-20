@@ -2,25 +2,53 @@
 
 This repository's purpose is to prove out a possible forward path on improving registry and package updates for Julia.
 
+The codebase has been organized into a clean modular structure:
+
+## Architecture
+
+### Server-side (`src/Server/`)
+- **ChunkingEngine.jl**: Content-defined chunking using desync
+- **ChunkStore.jl**: Chunk storage management and recompression with zstd dictionaries  
+- **HTTPServer.jl**: HTTP server for serving chunks and indices
+
+### Client-side (`src/Client/`)
+- **ChunkIndexing.jl**: Loading and parsing chunk indices (.caibx files)
+- **ChunkSynthesis.jl**: Reconstituting files from chunks
+- **RegistryUpdater.jl**: Registry update simulation and chunk downloading
+
+### Common/Shared (`src/Common/`)
+- **ChunkTypes.jl**: Core data types (ChunkId, CompressedChunk)
+- **LibZstd.jl**: Low-level Zstd frame parsing
+- **LibZstdSeekable.jl**: Seekable Zstd IO implementation
+- **TarAdapter.jl**: Tar filesystem adapter for random access
+
+### Test/Utilities (`test/`)
+- **RegistryUtils.jl**: Registry hash definitions and download functions
+
 ## Running the code
 
 To run the experiment locally, first run:
 
-```
+```bash
 julia --project -e 'import Pkg; Pkg.instantiate()'
-julia --project PopulatePkgServerChunkStore.jl
-julia --project ServeChunkStore.jl
+julia --project server_setup.jl
+julia --project server_serve.jl
 ```
 
 This will download some registries for use, then chunk those and create what a PkgServer would contain; a chunk store and some indexes.
 It will then start an HTTP server on port 8000 that serves the current directory, so that we can create this mockup with the greatest possible fidelity.
 
 Next, run:
-```
-julia --project SimulateClientRegistryUpdate.jl
+```bash
+julia --project client_update.jl
 ```
 
 This will simulate a client starting with an old registry, downloading a new index, then identifying which chunks are needed, downloading them, and synthesizing a new registry, then hashing the decompressed output to prove it is bit-for-bit correct.
+
+### Additional Scripts
+
+- `compare_compression.jl` - Compare different compression settings and scenarios
+- `test_seekable.jl` - Test seekable Zstd and Tar functionality
 
 # Background
 
@@ -42,8 +70,8 @@ We also optimize the `zstd` storage slightly by training a `zstd` dictionary on 
 
 ## Current results
 
-Running the `SimulateClientRegistryUpdate.jl` script will give some limited statistics, but the `CompareCompressionSettings.jl` file performs a slightly more exhaustive test comparing a few different scenarios.
-It compares the current methodology (transferring a gzipped tarball every time) to some of the alternatives, such as transferring a `zstd`-compressed tarball every time, and this content-defined chunking scheme.
+The `compare_compression.jl` script performs an exhaustive test comparing different scenarios.
+It compares the current methodology (transferring a gzipped tarball every time) to alternatives such as transferring a `zstd`-compressed tarball every time, and this content-defined chunking scheme.
 
 A partial view of the results can be seen in this image:
 ![](./CompressionStats.png)
