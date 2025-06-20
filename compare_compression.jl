@@ -30,7 +30,7 @@ stats_file = nothing
 function report_stats(name::String, compressed_file::String; data_transfer = filesize(compressed_file))
     global stats_file
     if stats_file === nothing
-        stats_file = open(joinpath(@__DIR__, "compression_stats_new.csv"); write=true)
+        stats_file = open(joinpath(@__DIR__, "compression_stats.csv"); write=true)
         println(stats_file, "Scenario,size_on_disk,data_transfer,transfer_portion,transfer_ratio,compression_ratio")
     end
     size_on_disk = filesize(compressed_file)

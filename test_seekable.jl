@@ -2,7 +2,7 @@
 
 # Test script for seekable Zstd and Tar functionality
 
-using Random
+using Random, Statistics
 include("src/Common/Common.jl")
 using .Common
 using TOML
